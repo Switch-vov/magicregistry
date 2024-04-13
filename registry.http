@@ -1,0 +1,60 @@
+### 获取所有服务实例
+GET http://localhost:8484/findAll?service=com.switchvov.magicrpc.UserService
+
+### 注册一个实例
+POST http://localhost:8484/reg?service=com.switchvov.magicrpc.UserService
+Content-Type: application/json
+
+{
+  "context": "magicrpc",
+  "host": "127.0.0.1",
+  "port": 8080,
+  "schema": "http",
+  "status": false,
+  "parameters": {
+    "env": "dev",
+    "tag": "RED"
+  }
+}
+
+### 取消注册一个实例
+POST http://localhost:8484/unreg?service=com.switchvov.magicrpc.UserService
+Content-Type: application/json
+
+{
+  "context": "magicrpc",
+  "host": "127.0.0.1",
+  "port": 8080,
+  "schema": "http",
+  "status": true
+}
+
+### 心跳
+POST http://localhost:8484/renew?service=com.switchvov.magicrpc.UserService
+Content-Type: application/json
+
+{
+  "context": "magicrpc",
+  "host": "127.0.0.1",
+  "port": 8080,
+  "schema": "http",
+  "status": true
+}
+
+### 批量心跳
+POST http://localhost:8484/renews?services=com.switchvov.magicrpc.UserService,com.switchvov.magicrpc.OrderService
+Content-Type: application/json
+
+{
+  "context": "magicrpc",
+  "host": "127.0.0.1",
+  "port": 8080,
+  "schema": "http",
+  "status": true
+}
+
+### 查询服务版本
+GET http://localhost:8484/version?service=com.switchvov.magicrpc.UserService
+
+### 批量查询服务版本
+GET http://localhost:8484/versions?services=com.switchvov.magicrpc.UserService,com.switchvov.magicrpc.OrderService
