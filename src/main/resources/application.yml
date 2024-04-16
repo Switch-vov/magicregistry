@@ -3,3 +3,8 @@ spring:
     name: magicregistry
 server:
   port: 8484
+magicregistry:
+  server-list:
+    - http://127.0.0.1:8484
+    - http://127.0.0.1:8485
+    - http://127.0.0.1:8486

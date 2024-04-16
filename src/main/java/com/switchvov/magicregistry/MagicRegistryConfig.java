@@ -1,5 +1,6 @@
 package com.switchvov.magicregistry;
 
+import com.switchvov.magicregistry.cluster.Cluster;
 import com.switchvov.magicregistry.health.HealthChecker;
 import com.switchvov.magicregistry.health.MagicHealthChecker;
 import com.switchvov.magicregistry.service.MagicRegistryService;
@@ -26,5 +27,12 @@ public class MagicRegistryConfig {
             @Autowired RegistryService registryService
     ) {
         return new MagicHealthChecker(registryService);
+    }
+
+    @Bean
+    public Cluster cluster(
+            @Autowired MagicRegistryConfigProperties registryConfigProperties
+    ) {
+        return new Cluster(registryConfigProperties);
     }
 }

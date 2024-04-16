@@ -1,5 +1,7 @@
 package com.switchvov.magicregistry;
 
+import com.switchvov.magicregistry.cluster.Cluster;
+import com.switchvov.magicregistry.cluster.Server;
 import com.switchvov.magicregistry.model.InstanceMeta;
 import com.switchvov.magicregistry.service.RegistryService;
 import lombok.extern.slf4j.Slf4j;
@@ -21,8 +23,16 @@ import java.util.Map;
 @RestController
 @Slf4j
 public class MagicRegistryController {
-    @Autowired
-    private RegistryService registryService;
+    private final RegistryService registryService;
+    private final Cluster cluster;
+
+    public MagicRegistryController(
+            @Autowired RegistryService registryService,
+            @Autowired Cluster cluster
+    ) {
+        this.registryService = registryService;
+        this.cluster = cluster;
+    }
 
     @RequestMapping("/reg")
     public InstanceMeta register(@RequestParam String service, @RequestBody InstanceMeta instance) {
@@ -64,5 +74,17 @@ public class MagicRegistryController {
     public Map<String, Long> versions(@RequestParam String services) {
         log.info(" ===> versions {}", services);
         return registryService.versions(services.split(","));
+    }
+
+    @RequestMapping("/info")
+    public Server info() {
+        log.info(" ===> info {}", cluster.self());
+        return cluster.self();
+    }
+
+    @RequestMapping("/cluster")
+    public List<Server> cluster() {
+        log.info(" ===> cluster {}", cluster.getServers());
+        return cluster.getServers();
     }
 }
