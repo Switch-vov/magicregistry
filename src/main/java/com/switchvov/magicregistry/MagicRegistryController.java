@@ -87,4 +87,17 @@ public class MagicRegistryController {
         log.info(" ===> cluster {}", cluster.getServers());
         return cluster.getServers();
     }
+
+    @RequestMapping("/leader")
+    public Server leader() {
+        log.info(" ===> leader {}", cluster.leader());
+        return cluster.leader();
+    }
+
+    @RequestMapping("/sl")
+    public Server sl() {
+        cluster.self().setLeader(true);
+        log.info(" ===> sl {}", cluster.self());
+        return cluster.self();
+    }
 }

@@ -8,9 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.commons.util.InetUtils;
 import org.springframework.cloud.commons.util.InetUtilsProperties;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -51,12 +49,22 @@ public class Cluster {
             host = "127.0.0.1";
         }
 
-        myself = new Server("http://" + host + ":" + "port", true, false, -1L);
+        myself = new Server("http://" + host + ":" + port, true, false, -1L);
         log.debug(" ===> myself = {}", myself);
 
         List<Server> servers = new ArrayList<>();
         for (String url : registryConfigProperties.getServerList()) {
             Server server = new Server();
+            if (url.contains("localhost")) {
+                url = url.replace("localhost", host);
+            }
+            if (url.contains("127.0.0.1")) {
+                url = url.replace("127.0.0.1", host);
+            }
+            if (myself.getUrl().equals(url)) {
+                servers.add(myself);
+                continue;
+            }
             server.setUrl(url);
             server.setStatus(false);
             server.setLeader(false);
@@ -66,16 +74,47 @@ public class Cluster {
         this.servers = servers;
 
         executor.scheduleWithFixedDelay(() -> {
-            updateServers();
-            electLeader();
-        }, 0, timeout, TimeUnit.MILLISECONDS);
+            try {
+                updateServers();
+                electLeader();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }, timeout, timeout, TimeUnit.MILLISECONDS);
     }
 
     private void electLeader() {
         List<Server> masters = servers.stream().filter(Server::isStatus).filter(Server::isLeader).toList();
         if (masters.isEmpty()) {
-//            elect();
+            log.debug(" ===> elect for no leader: {}", servers);
+            elect();
+            return;
         }
+        if (masters.size() > 1) {
+            log.debug(" ===> elect for more than one leader: {}", servers);
+            elect();
+            return;
+        }
+        log.debug(" ===> no need election for leader: {}", masters.get(0));
+    }
+
+    private void elect() {
+        // 1. 各个节点自己选，算法保证大家选的是同一个
+        // 2. 外部有一个分布式锁，谁拿到锁，谁是主
+        // 3. 分布式一致性算法，比如paxos,raft
+        for (Server server : servers) {
+            server.setLeader(false);
+        }
+        Optional<Server> minCandidate = servers.stream()
+                .filter(Server::isStatus)
+                .min(Comparator.comparingInt(Server::hashCode));
+        if (minCandidate.isPresent()) {
+            Server leader = minCandidate.get();
+            leader.setLeader(true);
+            log.debug(" ===> elect for leader: {}", leader);
+            return;
+        }
+        log.debug(" ===> elect failed for no leaders: {}", servers);
     }
 
     private void updateServers() {
@@ -98,6 +137,14 @@ public class Cluster {
 
     public Server self() {
         return myself;
+    }
+
+    public Server leader() {
+        return servers.stream()
+                .filter(Server::isStatus)
+                .filter(Server::isLeader)
+                .findFirst()
+                .orElse(null);
     }
 
 }

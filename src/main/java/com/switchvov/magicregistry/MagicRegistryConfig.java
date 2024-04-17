@@ -29,7 +29,7 @@ public class MagicRegistryConfig {
         return new MagicHealthChecker(registryService);
     }
 
-    @Bean
+    @Bean(initMethod = "init")
     public Cluster cluster(
             @Autowired MagicRegistryConfigProperties registryConfigProperties
     ) {
