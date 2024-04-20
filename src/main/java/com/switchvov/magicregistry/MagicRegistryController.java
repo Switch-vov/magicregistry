@@ -2,7 +2,9 @@ package com.switchvov.magicregistry;
 
 import com.switchvov.magicregistry.cluster.Cluster;
 import com.switchvov.magicregistry.cluster.Server;
+import com.switchvov.magicregistry.cluster.Snapshot;
 import com.switchvov.magicregistry.model.InstanceMeta;
+import com.switchvov.magicregistry.service.MagicRegistryService;
 import com.switchvov.magicregistry.service.RegistryService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,12 +39,20 @@ public class MagicRegistryController {
     @RequestMapping("/reg")
     public InstanceMeta register(@RequestParam String service, @RequestBody InstanceMeta instance) {
         log.info(" ===>register {} @ {}", service, instance);
+        checkLeader();
         return registryService.register(service, instance);
+    }
+
+    private void checkLeader() {
+        if (!cluster.self().isLeader()) {
+            throw new RuntimeException("current server is not a leader, the leader is " + cluster.leader().getUrl());
+        }
     }
 
     @RequestMapping("/unreg")
     public InstanceMeta unregister(@RequestParam String service, @RequestBody InstanceMeta instanceMeta) {
         log.info(" ===> unregister {} @ {}", service, instanceMeta);
+        checkLeader();
         return registryService.unregister(service, instanceMeta);
     }
 
@@ -55,12 +65,14 @@ public class MagicRegistryController {
     @RequestMapping("/renew")
     public long renew(@RequestParam String service, @RequestBody InstanceMeta instance) {
         log.info(" ===> renew {} @ {}", service, instance);
+        checkLeader();
         return registryService.renew(instance, service);
     }
 
     @RequestMapping("/renews")
     public long renews(@RequestParam String services, @RequestBody InstanceMeta instance) {
         log.info(" ===> renews {} @ {}", services, instance);
+        checkLeader();
         return registryService.renew(instance, services.split(","));
     }
 
@@ -100,4 +112,11 @@ public class MagicRegistryController {
         log.info(" ===> sl {}", cluster.self());
         return cluster.self();
     }
+
+    @RequestMapping("/snapshot")
+    public Snapshot snapshot() {
+        log.info(" ===> snapshot {}", MagicRegistryService.snapshot());
+        return MagicRegistryService.snapshot();
+    }
+
 }

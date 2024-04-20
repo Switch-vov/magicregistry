@@ -70,3 +70,12 @@ GET http://localhost:8484/leader
 
 ### sl 85
 GET http://localhost:8485/sl
+
+### 快照信息8484
+GET http://localhost:8484/snapshot
+
+### 快照信息8485
+GET http://localhost:8485/snapshot
+
+### 快照信息8486
+GET http://localhost:8486/snapshot

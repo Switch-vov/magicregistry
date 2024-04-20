@@ -1,5 +1,6 @@
 package com.switchvov.magicregistry.service;
 
+import com.switchvov.magicregistry.cluster.Snapshot;
 import com.switchvov.magicregistry.model.InstanceMeta;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.LinkedMultiValueMap;
@@ -25,10 +26,10 @@ public class MagicRegistryService implements RegistryService {
     private final static MultiValueMap<String, InstanceMeta> REGISTRY = new LinkedMultiValueMap<>();
     private final static Map<String, Long> VERSIONS = new ConcurrentHashMap<>();
     public final static Map<String, Long> TIMESTAMPS = new ConcurrentHashMap<>();
-    private final static AtomicLong VERSION = new AtomicLong(0);
+    public final static AtomicLong VERSION = new AtomicLong(0);
 
     @Override
-    public InstanceMeta register(String service, InstanceMeta instance) {
+    public synchronized InstanceMeta register(String service, InstanceMeta instance) {
         List<InstanceMeta> instances = REGISTRY.get(service);
         if (Objects.isNull(instances)) {
             instances = new ArrayList<>();
@@ -48,7 +49,7 @@ public class MagicRegistryService implements RegistryService {
     }
 
     @Override
-    public InstanceMeta unregister(String service, InstanceMeta instance) {
+    public synchronized InstanceMeta unregister(String service, InstanceMeta instance) {
         List<InstanceMeta> instances = REGISTRY.get(service);
         if (Objects.isNull(instances) || instances.isEmpty()) {
             return null;
@@ -67,7 +68,7 @@ public class MagicRegistryService implements RegistryService {
     }
 
     @Override
-    public long renew(InstanceMeta instance, String... services) {
+    public synchronized long renew(InstanceMeta instance, String... services) {
         long now = System.currentTimeMillis();
         for (String service : services) {
             TIMESTAMPS.put(service + "@" + instance.toUrl(), now);
@@ -83,5 +84,24 @@ public class MagicRegistryService implements RegistryService {
     @Override
     public Map<String, Long> versions(String... services) {
         return Arrays.stream(services).collect(HashMap::new, (map, service) -> map.put(service, version(service)), HashMap::putAll);
+    }
+
+    public static synchronized Snapshot snapshot() {
+        LinkedMultiValueMap<String, InstanceMeta> registry = new LinkedMultiValueMap<>();
+        registry.addAll(REGISTRY);
+        Map<String, Long> versions = new HashMap<>(VERSIONS);
+        Map<String, Long> timestamps = new HashMap<>(TIMESTAMPS);
+        return new Snapshot(registry, versions, timestamps, VERSION.get());
+    }
+
+    public static synchronized long restore(Snapshot snapshot) {
+        REGISTRY.clear();
+        REGISTRY.addAll(snapshot.getRegistry());
+        VERSIONS.clear();
+        VERSIONS.putAll(snapshot.getVersions());
+        TIMESTAMPS.clear();
+        TIMESTAMPS.putAll(snapshot.getTimestamps());
+        VERSION.set(snapshot.getVersion());
+        return snapshot.getVersion();
     }
 }
