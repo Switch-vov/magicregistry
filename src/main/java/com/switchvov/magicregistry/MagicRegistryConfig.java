@@ -24,9 +24,11 @@ public class MagicRegistryConfig {
 
     @Bean(initMethod = "start", destroyMethod = "stop")
     public HealthChecker healthChecker(
-            @Autowired RegistryService registryService
+            @Autowired RegistryService registryService,
+            @Autowired Cluster cluster
+
     ) {
-        return new MagicHealthChecker(registryService);
+        return new MagicHealthChecker(registryService, cluster);
     }
 
     @Bean(initMethod = "init")

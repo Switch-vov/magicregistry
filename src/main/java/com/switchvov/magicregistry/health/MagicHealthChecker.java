@@ -1,5 +1,6 @@
 package com.switchvov.magicregistry.health;
 
+import com.switchvov.magicregistry.cluster.Cluster;
 import com.switchvov.magicregistry.model.InstanceMeta;
 import com.switchvov.magicregistry.service.MagicRegistryService;
 import com.switchvov.magicregistry.service.RegistryService;
@@ -21,9 +22,11 @@ public class MagicHealthChecker implements HealthChecker {
     private final long timeout = 20_000;
 
     private final RegistryService registryService;
+    private final Cluster cluster;
 
-    public MagicHealthChecker(RegistryService registryService) {
+    public MagicHealthChecker(RegistryService registryService, Cluster cluster) {
         this.registryService = registryService;
+        this.cluster = cluster;
     }
 
     @Override
@@ -34,6 +37,9 @@ public class MagicHealthChecker implements HealthChecker {
                     long now = System.currentTimeMillis();
                     MagicRegistryService.TIMESTAMPS.forEach((serviceAndInstance, timestamp) -> {
                         if (now - timestamp <= timeout) {
+                            return;
+                        }
+                        if (!cluster.self().isLeader()) {
                             return;
                         }
                         log.info(" ===> Health checker: {} is down", serviceAndInstance);

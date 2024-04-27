@@ -3,9 +3,11 @@ package com.switchvov.magicregistry;
 import com.switchvov.magicregistry.cluster.Cluster;
 import com.switchvov.magicregistry.cluster.Server;
 import com.switchvov.magicregistry.cluster.Snapshot;
+import com.switchvov.magicregistry.http.HttpInvoker;
 import com.switchvov.magicregistry.model.InstanceMeta;
 import com.switchvov.magicregistry.service.MagicRegistryService;
 import com.switchvov.magicregistry.service.RegistryService;
+import com.switchvov.magicregistry.utils.JsonUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * endpoint for magic registry.
@@ -25,8 +29,14 @@ import java.util.Map;
 @RestController
 @Slf4j
 public class MagicRegistryController {
+    private static final String ENDPOINT_REG = "/reg";
+    private static final String ENDPOINT_UNREG = "/unreg";
+    private static final String ENDPOINT_RENEW = "/renew";
+    private static final String ENDPOINT_RENEWS = "/renews";
+
     private final RegistryService registryService;
     private final Cluster cluster;
+
 
     public MagicRegistryController(
             @Autowired RegistryService registryService,
@@ -36,24 +46,29 @@ public class MagicRegistryController {
         this.cluster = cluster;
     }
 
-    @RequestMapping("/reg")
+    @RequestMapping(ENDPOINT_REG)
     public InstanceMeta register(@RequestParam String service, @RequestBody InstanceMeta instance) {
         log.info(" ===>register {} @ {}", service, instance);
-        checkLeader();
-        return registryService.register(service, instance);
+        return Optional.ofNullable(changeLeader((leader) ->
+                        HttpInvoker.httpPost(JsonUtils.toJson(instance), regPath(service, leader), InstanceMeta.class)))
+                .orElseGet(() -> registryService.register(service, instance));
     }
 
-    private void checkLeader() {
+    private <T> T changeLeader(Function<Server, T> f) {
         if (!cluster.self().isLeader()) {
-            throw new RuntimeException("current server is not a leader, the leader is " + cluster.leader().getUrl());
+            Server leader = cluster.leader();
+            log.info(" ===> current server is not a leader, apply to leader: {}", leader.getUrl());
+            return f.apply(leader);
         }
+        return null;
     }
 
-    @RequestMapping("/unreg")
-    public InstanceMeta unregister(@RequestParam String service, @RequestBody InstanceMeta instanceMeta) {
-        log.info(" ===> unregister {} @ {}", service, instanceMeta);
-        checkLeader();
-        return registryService.unregister(service, instanceMeta);
+    @RequestMapping(ENDPOINT_UNREG)
+    public InstanceMeta unregister(@RequestParam String service, @RequestBody InstanceMeta instance) {
+        log.info(" ===> unregister {} @ {}", service, instance);
+        return Optional.ofNullable(changeLeader((leader) ->
+                        HttpInvoker.httpPost(JsonUtils.toJson(instance), unregPath(service, leader), InstanceMeta.class)))
+                .orElseGet(() -> registryService.unregister(service, instance));
     }
 
     @RequestMapping("/findAll")
@@ -62,18 +77,20 @@ public class MagicRegistryController {
         return registryService.getAllInstances(service);
     }
 
-    @RequestMapping("/renew")
+    @RequestMapping(ENDPOINT_RENEW)
     public long renew(@RequestParam String service, @RequestBody InstanceMeta instance) {
         log.info(" ===> renew {} @ {}", service, instance);
-        checkLeader();
-        return registryService.renew(instance, service);
+        return Optional.ofNullable(changeLeader((leader) ->
+                        HttpInvoker.httpPost(JsonUtils.toJson(instance), renewPath(service, leader), Long.class)))
+                .orElseGet(() -> registryService.renew(instance, service));
     }
 
-    @RequestMapping("/renews")
+    @RequestMapping(ENDPOINT_RENEWS)
     public long renews(@RequestParam String services, @RequestBody InstanceMeta instance) {
         log.info(" ===> renews {} @ {}", services, instance);
-        checkLeader();
-        return registryService.renew(instance, services.split(","));
+        return Optional.ofNullable(changeLeader((leader) ->
+                        HttpInvoker.httpPost(JsonUtils.toJson(instance), renewsPath(services, leader), Long.class)))
+                .orElseGet(() -> registryService.renew(instance, services.split(",")));
     }
 
     @RequestMapping("/version")
@@ -119,4 +136,20 @@ public class MagicRegistryController {
         return MagicRegistryService.snapshot();
     }
 
+
+    private static String regPath(String service, Server leader) {
+        return leader.getUrl() + ENDPOINT_REG + "?service=" + service;
+    }
+
+    private static String unregPath(String service, Server leader) {
+        return leader.getUrl() + ENDPOINT_UNREG + "?service=" + service;
+    }
+
+    private static String renewPath(String service, Server leader) {
+        return leader.getUrl() + ENDPOINT_RENEW + "?service=" + service;
+    }
+
+    private static String renewsPath(String services, Server leader) {
+        return leader.getUrl() + ENDPOINT_RENEWS + "?services=" + services;
+    }
 }
